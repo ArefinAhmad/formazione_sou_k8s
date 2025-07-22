@@ -2,7 +2,7 @@ pipeline {
     agent { label 'docker' }
 
     environment {
-        DOCKER_IMAGE = 'yourdockerhubusername/flask-app-example'
+        DOCKER_IMAGE = 'arefinahmad/flask-app-example'
         REGISTRY_CREDENTIALS = 'dockerhub-creds'
     }
 
