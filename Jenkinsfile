@@ -2,38 +2,60 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'yourdockerhubusername/flask-hello'
-        IMAGE_TAG = 'v1'
-        REGISTRY_CREDENTIALS_ID = 'dockerhub-credentials' // Jenkins credenziali con username e password DockerHub
-        DOCKER_REGISTRY = 'https://index.docker.io/v1/'
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials') // Jenkins secret ID
+        DOCKERHUB_USERNAME = 'arefinahmad' // modifica col tuo username Docker Hub
+        IMAGE_NAME = "${DOCKERHUB_USERNAME}/flask-app-example"
     }
 
     stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Set Docker Image Tag') {
+            steps {
+                script {
+                    def branch = env.GIT_BRANCH?.replaceAll(/^origin\//, '') ?: 'master'
+                    def commit = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    def gitTag = sh(returnStdout: true, script: 'git describe --tags --exact-match || true').trim()
+
+                    if (gitTag) {
+                        env.IMAGE_TAG = gitTag
+                    } else if (branch == 'master') {
+                        env.IMAGE_TAG = 'latest'
+                    } else if (branch == 'develop') {
+                        env.IMAGE_TAG = "develop-${commit}"
+                    } else {
+                        env.IMAGE_TAG = "dev-${commit}"
+                    }
+
+                    echo "Docker image tag: ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
-                script {
-                    docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
-                }
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ./app"
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry("${DOCKER_REGISTRY}", "${REGISTRY_CREDENTIALS_ID}") {
-                        def image = docker.image("${IMAGE_NAME}:${IMAGE_TAG}")
-                        image.push()
-                        image.push("latest")
-                    }
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_USERNAME} --password-stdin"
+                    sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker logout"
                 }
             }
         }
+    }
 
-        stage('Cleanup local images') {
-            steps {
-                sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
-                sh "docker rmi ${IMAGE_NAME}:latest || true"
-            }
+    post {
+        always {
+            cleanWs()
         }
     }
 }
