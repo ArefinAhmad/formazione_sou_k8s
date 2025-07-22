@@ -1,61 +1,48 @@
 pipeline {
-    agent any
+    agent { label 'docker' }
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials') // Jenkins secret ID
-        DOCKERHUB_USERNAME = 'arefinahmad' // modifica col tuo username Docker Hub
-        IMAGE_NAME = "${DOCKERHUB_USERNAME}/flask-app-example"
+        DOCKER_IMAGE = 'yourdockerhubusername/flask-app-example'
+        REGISTRY_CREDENTIALS = 'dockerhub-creds'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
-            }
-        }
-
-        stage('Set Docker Image Tag') {
-            steps {
-                script {
-                    def branch = env.GIT_BRANCH?.replaceAll(/^origin\//, '') ?: 'master'
-                    def commit = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                    def gitTag = sh(returnStdout: true, script: 'git describe --tags --exact-match || true').trim()
-
-                    if (gitTag) {
-                        env.IMAGE_TAG = gitTag
-                    } else if (branch == 'master') {
-                        env.IMAGE_TAG = 'latest'
-                    } else if (branch == 'develop') {
-                        env.IMAGE_TAG = "develop-${commit}"
-                    } else {
-                        env.IMAGE_TAG = "dev-${commit}"
-                    }
-
-                    echo "Docker image tag: ${env.IMAGE_TAG}"
-                }
+                git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
                 script {
-                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_USERNAME} --password-stdin"
-                    sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
-                    sh "docker logout"
+                    def tag = 'latest'
+                    if (env.GIT_BRANCH ==~ /origin\/tags\/.*/) {
+                        tag = env.GIT_BRANCH.replaceFirst(/^origin\/tags\//, '')
+                    } else if (env.GIT_BRANCH == 'origin/develop') {
+                        tag = "develop-${env.GIT_COMMIT.take(7)}"
+                    }
+
+                    docker.build("${DOCKER_IMAGE}:${tag}")
                 }
             }
         }
-    }
 
-    post {
-        always {
-            cleanWs()
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    def tag = 'latest'
+                    if (env.GIT_BRANCH ==~ /origin\/tags\/.*/) {
+                        tag = env.GIT_BRANCH.replaceFirst(/^origin\/tags\//, '')
+                    } else if (env.GIT_BRANCH == 'origin/develop') {
+                        tag = "develop-${env.GIT_COMMIT.take(7)}"
+                    }
+
+                    docker.withRegistry('https://index.docker.io/v1/', REGISTRY_CREDENTIALS) {
+                        docker.image("${DOCKER_IMAGE}:${tag}").push()
+                    }
+                }
+            }
         }
     }
 }
