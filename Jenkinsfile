@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'docker' }
+    agent agent1
 
     environment {
         DOCKER_IMAGE = 'arefinahmad/flask-app-example'
