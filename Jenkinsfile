@@ -1,48 +1,47 @@
 pipeline {
-    agent agent1
+  agent {
+    label 'agent1'
+  }
 
-    environment {
-        DOCKER_IMAGE = 'arefinahmad/flask-app-example'
-        REGISTRY_CREDENTIALS = 'dockerhub-creds'
+  environment {
+    IMAGE_NAME = 'arefinahmad/flask-hello-world'
+    GIT_COMMIT_SHORT = "${env.GIT_COMMIT[0..6]}"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git', branch: 'main'
+      }
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git'
-            }
+    stage('Build Docker Image') {
+      steps {
+        script {
+          dockerImage = docker.build("${IMAGE_NAME}:${GIT_COMMIT_SHORT}")
         }
-
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    def tag = 'latest'
-                    if (env.GIT_BRANCH ==~ /origin\/tags\/.*/) {
-                        tag = env.GIT_BRANCH.replaceFirst(/^origin\/tags\//, '')
-                    } else if (env.GIT_BRANCH == 'origin/develop') {
-                        tag = "develop-${env.GIT_COMMIT.take(7)}"
-                    }
-
-                    docker.build("${DOCKER_IMAGE}:${tag}")
-                }
-            }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
-                script {
-                    def tag = 'latest'
-                    if (env.GIT_BRANCH ==~ /origin\/tags\/.*/) {
-                        tag = env.GIT_BRANCH.replaceFirst(/^origin\/tags\//, '')
-                    } else if (env.GIT_BRANCH == 'origin/develop') {
-                        tag = "develop-${env.GIT_COMMIT.take(7)}"
-                    }
-
-                    docker.withRegistry('https://index.docker.io/v1/', REGISTRY_CREDENTIALS) {
-                        docker.image("${DOCKER_IMAGE}:${tag}").push()
-                    }
-                }
-            }
-        }
+      }
     }
+
+    stage('Push to DockerHub') {
+      steps {
+        withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
+          script {
+            dockerImage.push()
+            dockerImage.push('latest')
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Build e push completati con successo!"
+    }
+    failure {
+      echo "Qualcosa è andato storto."
+    }
+  }
 }
+
