@@ -22,6 +22,12 @@ pipeline {
         }
       }
     }
+    stage('Login to Docker Hub') {
+  steps {
+    sh 'echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin'
+  }
+}
+
 
     stage('Push to DockerHub') {
       steps {
