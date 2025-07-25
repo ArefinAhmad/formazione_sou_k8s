@@ -10,9 +10,9 @@ pipeline {
     IMAGE_NAME = 'arefinahmad/flask-hello-world'
   }
   def tagExists = sh(script: "git ls-remote --tags origin refs/tags/${params.TAG_NAME}", returnStatus: true) == 0
-if (!tagExists) {
-  error "Il tag '${params.TAG_NAME}' non esiste nel repository remoto!"
-}
+    if (!tagExists) {
+      error "Il tag '${params.TAG_NAME}' non esiste nel repository remoto!"
+            }
 
 
   stages {
