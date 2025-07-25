@@ -78,9 +78,4 @@ pipeline {
       echo "Qualcosa è andato storto."
     }
   }
-<<<<<<< HEAD
 }
-=======
-}
-
->>>>>>> 6fbfe5937991fbe8483d952d11c80d567a601510
