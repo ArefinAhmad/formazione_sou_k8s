@@ -1,3 +1,6 @@
+def dockerTag = ''
+def dockerImage
+
 pipeline {
   agent {
     label 'agent1'
@@ -58,11 +61,10 @@ pipeline {
         withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
           script {
             dockerImage.push()
-            // Solo se è il branch master, fai anche il push del tag 'latest'
-            if (dockerTag != 'latest') {
-              echo "Skipping 'latest' tag push since current tag is ${dockerTag}"
-            } else {
+            if (dockerTag == 'latest') {
               dockerImage.push('latest')
+            } else {
+              echo "Skipping 'latest' tag push since current tag is ${dockerTag}"
             }
           }
         }
@@ -79,3 +81,4 @@ pipeline {
     }
   }
 }
+
