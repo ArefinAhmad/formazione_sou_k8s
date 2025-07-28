@@ -5,6 +5,7 @@ pipeline {
 
   environment {
     IMAGE_NAME = 'arefinahmad/flask-hello-world'
+    DOCKER_BUILDKIT = '0'
   }
 
   parameters {
@@ -14,7 +15,7 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git', branch: "${env.BRANCH_NAME ?: 'main'}"
+        checkout scm
       }
     }
 
@@ -23,7 +24,8 @@ pipeline {
         script {
           def dockerTag
           def commitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          def branchName = env.BRANCH_NAME ?: sh(script: "git name-rev --name-only HEAD", returnStdout: true).trim()
+          def rawBranchName = env.BRANCH_NAME ?: sh(script: "git name-rev --name-only HEAD", returnStdout: true).trim()
+          def branchName = rawBranchName.replaceAll("^remotes/origin/", "")
 
           echo "Branch rilevato: ${branchName}"
           echo "Commit SHA: ${commitSha}"
@@ -91,4 +93,3 @@ pipeline {
     }
   }
 }
-
