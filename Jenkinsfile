@@ -21,6 +21,7 @@ pipeline {
     stage('Determine Docker Tag') {
       steps {
         script {
+          def dockerTag
           def commitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           def branchName = env.BRANCH_NAME ?: sh(script: "git name-rev --name-only HEAD", returnStdout: true).trim()
 
@@ -28,7 +29,7 @@ pipeline {
           echo "Commit SHA: ${commitSha}"
 
           if (params.TAG_NAME?.trim()) {
-            dockerTag = params.TAG_NAME
+            dockerTag = params.TAG_NAME.trim()
           } else if (branchName == 'main' || branchName == 'master') {
             dockerTag = 'latest'
           } else if (branchName == 'develop') {
@@ -38,6 +39,9 @@ pipeline {
           }
 
           echo "Docker image tag: ${dockerTag}"
+
+          // Salvo dockerTag come variabile di ambiente per usarlo negli stage successivi
+          env.DOCKER_TAG = dockerTag
         }
       }
     }
@@ -45,7 +49,9 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         script {
-          dockerImage = docker.build("${IMAGE_NAME}:${dockerTag}")
+          def dockerImage = docker.build("${IMAGE_NAME}:${env.DOCKER_TAG}")
+          // salvo dockerImage in variabile globale per stage successivi
+          env.DOCKER_IMAGE = "${IMAGE_NAME}:${env.DOCKER_TAG}"
         }
       }
     }
@@ -62,13 +68,13 @@ pipeline {
       steps {
         withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
           script {
-            dockerImage.push()
+            sh "docker push ${env.DOCKER_IMAGE}"
 
-            if (dockerTag == 'latest') {
+            if (env.DOCKER_TAG == 'latest') {
               echo "Pushing 'latest' tag"
-              dockerImage.push('latest')
+              sh "docker push ${IMAGE_NAME}:latest"
             } else {
-              echo "Skipping 'latest' tag push since current tag is ${dockerTag}"
+              echo "Skipping 'latest' tag push since current tag is ${env.DOCKER_TAG}"
             }
           }
         }
@@ -78,7 +84,7 @@ pipeline {
 
   post {
     success {
-      echo "Build e push completati con successo con tag: ${dockerTag}"
+      echo "Build e push completati con successo con tag: ${env.DOCKER_TAG}"
     }
     failure {
       echo "Qualcosa è andato storto."
