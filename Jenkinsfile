@@ -1,5 +1,5 @@
 
-         def dockerTag = ''
+def dockerTag = ''
 def dockerImage
 
 pipeline {
