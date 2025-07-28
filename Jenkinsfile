@@ -14,7 +14,7 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git', branch: "${env.BRANCH_NAME ?: 'main'}"
+        checkout scm
       }
     }
 
