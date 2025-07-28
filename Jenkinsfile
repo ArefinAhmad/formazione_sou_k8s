@@ -31,13 +31,10 @@ pipeline {
 
             echo "Il tag esiste. Eseguo checkout di ${params.TAG_NAME}..."
             checkout([$class: 'GitSCM',
-              branches: [[name: "refs/tags/${params.TAG_NAME}"]],
+              branches: [[name: "*/${env.BRANCH_NAME}"]],
               userRemoteConfigs: [[url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git']]
             ])
-          } else {
-            echo "Nessun TAG_NAME fornito. Faccio checkout del branch main..."
-            git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git', branch: 'main'
-          }
+          } 
         }
       }
     }
