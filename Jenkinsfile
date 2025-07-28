@@ -14,7 +14,8 @@ pipeline {
   environment {
     IMAGE_NAME = 'arefinahmad/flask-hello-world'
   }
-
+  def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+    echo "Branch rilevato: ${branchName}"
   stages {
 
     stage('Checkout') {
