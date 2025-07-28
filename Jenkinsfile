@@ -1,56 +1,35 @@
-
-def dockerTag = ''
-def dockerImage
-
 pipeline {
   agent {
     label 'agent1'
   }
 
-  parameters {
-    string(name: 'TAG_NAME', defaultValue: '', description: 'Inserisci un tag git esistente (es. v1.0.0) oppure lascia vuoto per usare il branch main')
-  }
-
   environment {
     IMAGE_NAME = 'arefinahmad/flask-hello-world'
   }
-  
-    
-  stages {
 
+  parameters {
+    string(name: 'TAG_NAME', defaultValue: '', description: 'Tag Git specifico da usare (opzionale)')
+  }
+
+  stages {
     stage('Checkout') {
       steps {
-        script {
-          if (params.TAG_NAME?.trim()) {
-            echo "Controllo se il tag '${params.TAG_NAME}' esiste..."
-            def tagExists = sh(script: "git ls-remote --tags origin refs/tags/${params.TAG_NAME}", returnStatus: true) == 0
-            if (!tagExists) {
-              error "Il tag '${params.TAG_NAME}' non esiste nel repository remoto!"
-            }
-
-            echo "Il tag esiste. Eseguo checkout di ${params.TAG_NAME}..."
-            checkout([$class: 'GitSCM',
-              branches: [[name: "*/${env.BRANCH_NAME}"]],
-              userRemoteConfigs: [[url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git']]
-            ])
-          } 
-        }
+        git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git', branch: "${env.BRANCH_NAME ?: 'main'}"
       }
     }
 
     stage('Determine Docker Tag') {
       steps {
         script {
+          def dockerTag
           def commitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          def branchName = env.BRANCH_NAME ?: sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+          def branchName = env.BRANCH_NAME ?: sh(script: "git name-rev --name-only HEAD", returnStdout: true).trim()
 
-
-              
-          echo "Git branch: ${branchName}"
-          echo "Git commit: ${commitSha}"
+          echo "Branch rilevato: ${branchName}"
+          echo "Commit SHA: ${commitSha}"
 
           if (params.TAG_NAME?.trim()) {
-            dockerTag = params.TAG_NAME
+            dockerTag = params.TAG_NAME.trim()
           } else if (branchName == 'main' || branchName == 'master') {
             dockerTag = 'latest'
           } else if (branchName == 'develop') {
@@ -59,7 +38,10 @@ pipeline {
             dockerTag = commitSha
           }
 
-          echo "Docker image tag sarà: ${dockerTag}"
+          echo "Docker image tag: ${dockerTag}"
+
+          // Salvo dockerTag come variabile di ambiente per usarlo negli stage successivi
+          env.DOCKER_TAG = dockerTag
         }
       }
     }
@@ -67,7 +49,9 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         script {
-          dockerImage = docker.build("${IMAGE_NAME}:${dockerTag}")
+          def dockerImage = docker.build("${IMAGE_NAME}:${env.DOCKER_TAG}")
+          // salvo dockerImage in variabile globale per stage successivi
+          env.DOCKER_IMAGE = "${IMAGE_NAME}:${env.DOCKER_TAG}"
         }
       }
     }
@@ -84,12 +68,13 @@ pipeline {
       steps {
         withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
           script {
-            dockerImage.push()
-            if (dockerTag != 'latest') {
-              echo "Immagine con tag ${dockerTag} pushata!"
+            sh "docker push ${env.DOCKER_IMAGE}"
+
+            if (env.DOCKER_TAG == 'latest') {
+              echo "Pushing 'latest' tag"
+              sh "docker push ${IMAGE_NAME}:latest"
             } else {
-              echo "Push anche del tag 'latest'"
-              dockerImage.push('latest')
+              echo "Skipping 'latest' tag push since current tag is ${env.DOCKER_TAG}"
             }
           }
         }
@@ -99,10 +84,10 @@ pipeline {
 
   post {
     success {
-      echo "Build e push completati con successo! Docker tag: ${dockerTag}"
+      echo "Build e push completati con successo con tag: ${env.DOCKER_TAG}"
     }
     failure {
-      echo "Qualcosa è andato storto nella pipeline."
+      echo "Qualcosa è andato storto."
     }
   }
 }
