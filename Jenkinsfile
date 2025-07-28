@@ -42,7 +42,7 @@ pipeline {
       steps {
         script {
           def commitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          def branchName = env.BRANCH_NAME ?: sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+          def branchName = sh(script: "git name-rev --name-only HEAD", returnStdout: true).trim()
 
               
           echo "Git branch: ${branchName}"
