@@ -5,6 +5,7 @@ pipeline {
 
   environment {
     IMAGE_NAME = 'arefinahmad/flask-hello-world'
+    DOCKER_BUILDKIT = '0'
   }
 
   parameters {
