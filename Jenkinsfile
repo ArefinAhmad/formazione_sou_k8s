@@ -1,4 +1,5 @@
-def dockerTag = ''
+
+         def dockerTag = ''
 def dockerImage
 
 pipeline {
@@ -6,19 +7,36 @@ pipeline {
     label 'agent1'
   }
 
+  parameters {
+    string(name: 'TAG_NAME', defaultValue: '', description: 'Inserisci un tag git esistente (es. v1.0.0) oppure lascia vuoto per usare il branch main')
+  }
+
   environment {
     IMAGE_NAME = 'arefinahmad/flask-hello-world'
   }
-  def tagExists = sh(script: "git ls-remote --tags origin refs/tags/${params.TAG_NAME}", returnStatus: true) == 0
-    if (!tagExists) {
-      error "Il tag '${params.TAG_NAME}' non esiste nel repository remoto!"
-            }
-
 
   stages {
+
     stage('Checkout') {
       steps {
-        git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git', branch: 'main'
+        script {
+          if (params.TAG_NAME?.trim()) {
+            echo "Controllo se il tag '${params.TAG_NAME}' esiste..."
+            def tagExists = sh(script: "git ls-remote --tags origin refs/tags/${params.TAG_NAME}", returnStatus: true) == 0
+            if (!tagExists) {
+              error "Il tag '${params.TAG_NAME}' non esiste nel repository remoto!"
+            }
+
+            echo "Il tag esiste. Eseguo checkout di ${params.TAG_NAME}..."
+            checkout([$class: 'GitSCM',
+              branches: [[name: "refs/tags/${params.TAG_NAME}"]],
+              userRemoteConfigs: [[url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git']]
+            ])
+          } else {
+            echo "Nessun TAG_NAME fornito. Faccio checkout del branch main..."
+            git url: 'https://github.com/ArefinAhmad/formazione_sou_k8s.git', branch: 'main'
+          }
+        }
       }
     }
 
@@ -27,12 +45,13 @@ pipeline {
         script {
           def commitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+
           echo "Git branch: ${branchName}"
           echo "Git commit: ${commitSha}"
 
-          if (env.TAG_NAME) {
-            dockerTag = env.TAG_NAME
-          } else if (branchName == 'master') {
+          if (params.TAG_NAME?.trim()) {
+            dockerTag = params.TAG_NAME
+          } else if (branchName == 'main' || branchName == 'master') {
             dockerTag = 'latest'
           } else if (branchName == 'develop') {
             dockerTag = "develop-${commitSha}"
@@ -40,7 +59,7 @@ pipeline {
             dockerTag = commitSha
           }
 
-          echo "Docker image tag will be: ${dockerTag}"
+          echo "Docker image tag sarà: ${dockerTag}"
         }
       }
     }
@@ -66,10 +85,11 @@ pipeline {
         withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
           script {
             dockerImage.push()
-            if (dockerTag == 'latest') {
-              dockerImage.push('latest')
+            if (dockerTag != 'latest') {
+              echo "Immagine con tag ${dockerTag} pushata!"
             } else {
-              echo "Skipping 'latest' tag push since current tag is ${dockerTag}"
+              echo "Push anche del tag 'latest'"
+              dockerImage.push('latest')
             }
           }
         }
@@ -79,11 +99,10 @@ pipeline {
 
   post {
     success {
-      echo "Build e push completati con successo con tag: ${dockerTag}"
+      echo "Build e push completati con successo! Docker tag: ${dockerTag}"
     }
     failure {
-      echo "Qualcosa è andato storto."
+      echo "Qualcosa è andato storto nella pipeline."
     }
   }
 }
-
