@@ -14,8 +14,8 @@ pipeline {
   environment {
     IMAGE_NAME = 'arefinahmad/flask-hello-world'
   }
-  def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
-    echo "Branch rilevato: ${branchName}"
+  
+    
   stages {
 
     stage('Checkout') {
@@ -46,7 +46,7 @@ pipeline {
         script {
           def commitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
-
+              echo "Branch rilevato: ${branchName}"
           echo "Git branch: ${branchName}"
           echo "Git commit: ${commitSha}"
 
