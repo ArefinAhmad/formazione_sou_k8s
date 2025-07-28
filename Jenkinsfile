@@ -24,7 +24,8 @@ pipeline {
         script {
           def dockerTag
           def commitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          def branchName = env.BRANCH_NAME ?: sh(script: "git name-rev --name-only HEAD", returnStdout: true).trim()
+          def rawBranchName = env.BRANCH_NAME ?: sh(script: "git name-rev --name-only HEAD", returnStdout: true).trim()
+          def branchName = rawBranchName.replaceAll("^remotes/origin/", "")
 
           echo "Branch rilevato: ${branchName}"
           echo "Commit SHA: ${commitSha}"
